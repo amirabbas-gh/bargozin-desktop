@@ -147,14 +147,14 @@ export default function Download() {
 
   const successResults = usableResults.filter((r) => r.success);
   const failedResults = usableResults.filter((r) => !r.success);
-  const totalResults = usableResults.length;
+  const totalResults = new Set(usableResults.map((result) => result.dns_server)).size;
 
   const isInProgress =
     !isCompleted &&
     (isLoading || (totalResults > 0 && totalResults < totalExpected));
-
   const showSuccessMoreHint = useScrollHint(rightColumnRef, [successResults.length]);
   const showFailedMoreHint = useScrollHint(leftColumnRef, [failedResults.length]);
+
   const handleCancel = async () => {
     currentSessionRef.current += 1;
     await cancelRunningTests();
@@ -288,10 +288,10 @@ export default function Download() {
         </div>
 
         <div className="flex items-end gap-2 dir-fa">
-          <div className="w-30.5 h-10.75 bg-[#30363D] border-[#444C56] border rounded-xl grid grid-cols-3">
+          <div className="w-30.5 h-10.75 bg-[#30363D] border-[#444C56] border rounded-xl grid grid-cols-3 cursor-pointer">
             <button
               onClick={() => setDownloadTime(downloadTime + 1)}
-              className="h-full w-full flex items-center justify-center hover:bg-[#262a30] rounded-r-xl p-1 select-none"
+              className="h-full w-full flex items-center justify-center hover:bg-[#262a30] rounded-r-xl p-1 select-none cursor-pointer"
             >
               +
             </button>
@@ -304,7 +304,7 @@ export default function Download() {
             />
             <button
               onClick={() => setDownloadTime(downloadTime - 1)}
-              className="h-full w-full flex items-center justify-center hover:bg-[#262a30] rounded-l-xl p-1 select-none"
+              className="h-full w-full flex items-center justify-center hover:bg-[#262a30] rounded-l-xl p-1 select-none cursor-pointer"
             >
               -
             </button>
@@ -416,11 +416,11 @@ export default function Download() {
 
               {failedResults.length > 5 && showFailedMoreHint && (
                 <>
-                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
+                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-linear-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
                   <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2">
                     <button
                       onClick={() => scrollToBottom(leftColumnRef)}
-                      className="text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 shadow-lg dir-fa flex items-center gap-2"
+                      className="text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 shadow-lg dir-fa flex items-center gap-2 cursor-pointer"
                     >
                       <DoubleChevronDown />
                       موارد بیشتر

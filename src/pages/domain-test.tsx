@@ -133,14 +133,16 @@ export default function DomainTest() {
     }
   };
 
-  const totalResults = usableResults.length + unusableResults.length;
+  const totalResults = new Set(
+    [...usableResults, ...unusableResults].map((result) => result.dns_server)
+  ).size;
   const totalExpected = 27; // Total number of DNS servers
   const isInProgress =
     !isCompleted &&
     (isLoading || (totalResults > 0 && totalResults < totalExpected));
-
   const showUsableMoreHint = useScrollHint(rightColumnRef, [usableResults.length]);
   const showUnusableMoreHint = useScrollHint(leftColumnRef, [unusableResults.length]);
+
   const handleCancel = async () => {
     currentSessionRef.current += 1;
     await cancelRunningTests();
@@ -279,7 +281,7 @@ export default function DomainTest() {
                     </p>
                     <button
                       onClick={handleDnsTest}
-                      className="flex gap-2 mt-2 text-white hover:text-[#848484] transition-colors duration-200 shadow-lg dir-fa items-center justify-center px-4 py-2 rounded-lg text-sm"
+                      className="flex gap-2 mt-2 cursor-pointer text-white hover:text-[#848484] transition-colors duration-200 shadow-lg dir-fa items-center justify-center px-4 py-2 rounded-lg text-sm"
                     >
                       <Retry />
                       تست مجدد
@@ -340,13 +342,13 @@ export default function DomainTest() {
               {unusableResults.length >= 5 && showUnusableMoreHint && (
                 <>
                   {/* Black Gradient Overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
+                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-linear-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
 
                   {/* More Items Button */}
                   <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2">
                     <button
                       onClick={() => scrollToBottom(leftColumnRef)}
-                      className="text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 shadow-lg dir-fa flex items-center gap-2"
+                      className="text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 shadow-lg dir-fa flex items-center gap-2 cursor-pointer"
                     >
                       <DoubleChevronDown />
                       موارد بیشتر
