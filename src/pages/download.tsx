@@ -8,6 +8,7 @@ import DownloadResultItem from "../components/download-result-item";
 import { useAlert, useAlertHelpers } from "../components/alert";
 import Info from "../components/svg/info";
 import { useSetSystemDns } from "../hooks/use-set-system-dns";
+import { cancelRunningTests } from "../hooks/use-cancel-test";
 
 // Type definition for download speed test results
 interface DownloadSpeedResult {
@@ -24,7 +25,6 @@ interface DownloadSpeedResult {
 
 export default function Download() {
   const [isLoading, setIsLoading] = useState(false);
-  const [totalResults, setTotalResults] = useState(0);
   const [totalExpected] = useState(27);
   const [isCompleted, setIsCompleted] = useState(false);
   const [usableResults, setUsableResults] = useState<DownloadSpeedResult[]>([]);
@@ -33,6 +33,7 @@ export default function Download() {
 
   const rightColumnRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
+  const currentSessionRef = useRef<number>(0);
 
   useEffect(() => {
     console.log("Setting up download test event listeners");
@@ -42,6 +43,10 @@ export default function Download() {
       (event) => {
         const result = event.payload;
         console.log("Received download test result:", result);
+
+        if (result.session_id !== currentSessionRef.current) {
+          return;
+        }
 
         if (result.success) {
           console.log(
@@ -61,11 +66,6 @@ export default function Download() {
           setTimeout(() => scrollToBottom(leftColumnRef), 100);
         }
 
-        setTotalResults((prev) => {
-          const newCount = prev + 1;
-          console.log("Total results count:", newCount);
-          return newCount;
-        });
       }
     );
 
@@ -88,7 +88,6 @@ export default function Download() {
     setIsLoading(false);
     setIsCompleted(false);
     setUsableResults([]);
-    setTotalResults(0);
 
     invoke("abort_all_tasks");
   }, []);
@@ -114,7 +113,7 @@ export default function Download() {
     setIsLoading(true);
     setIsCompleted(false);
     setUsableResults([]);
-    setTotalResults(0);
+    currentSessionRef.current = 0;
 
     try {
       console.log("About to start download test...");
@@ -147,11 +146,23 @@ export default function Download() {
 
   const successResults = usableResults.filter((r) => r.success);
   const failedResults = usableResults.filter((r) => !r.success);
+  const totalResults = usableResults.length;
+
+  const isInProgress =
+    !isCompleted &&
+    (isLoading || (totalResults > 0 && totalResults < totalExpected));
+
+  const handleCancel = async () => {
+    currentSessionRef.current += 1;
+    await cancelRunningTests();
+    setIsLoading(false);
+    setIsCompleted(true);
+  };
 
   return (
-    <div className="text-right h-full flex flex-col pr-[35px]">
+    <div className="text-right h-full flex flex-col pr-8.75">
       {/* Input Section - Fixed height */}
-      <div className="flex-shrink-0">
+      <div className="shrink-0">
         <p className="mb-4 flex justify-end items-center gap-2">
           <button
             className="cursor-pointer"
@@ -176,13 +187,14 @@ export default function Download() {
           </button>
           آدرس فایل دانلودی{" "}
         </p>
-        <div className="mb-4 relative">
+        <div className="mb-4 flex gap-2 items-stretch">
+          <div className="relative flex-1 min-w-0">
           {/* Progress Bar Background */}
           {(totalResults > 0 || isLoading) && (
             <div className="absolute inset-0 rounded-md overflow-hidden">
               <div
                 className={`h-full transition-all duration-500 ${isLoading && totalResults === 0
-                  ? "bg-gradient-to-r from-blue-500/20 via-blue-500/30 to-blue-500/20 animate-pulse"
+                  ? "bg-linear-to-r from-blue-500/20 via-blue-500/30 to-blue-500/20 animate-pulse"
                   : isLoading && totalResults < totalExpected
                     ? "bg-green-500/25 animate-pulse"
                     : "bg-green-500/30"
@@ -211,31 +223,38 @@ export default function Download() {
             }}
             className="main-input dir-fa"
             placeholder="لینکی که مستقیما به شروع دانلود منجر می‌شود را وارد کنید"
-            disabled={isLoading}
+            disabled={isInProgress}
           />
 
           {/* Progress Text */}
-          {(totalResults > 0 || isLoading) && (
-            <div className="absolute left-[200px] top-1/2 transform -translate-y-1/2 text-xs text-gray-400 z-20">
+          {isInProgress && (
+            <div className="absolute left-50 top-1/2 transform -translate-y-1/2 text-xs text-gray-400 z-20 pointer-events-none">
               {isLoading && totalResults === 0
                 ? "در حال شروع تست..."
-                : `${totalResults} / ${totalExpected} ${isCompleted ? "تکمیل شد" : ""
-                }`}
+                : `${totalResults} / ${totalExpected}`}
             </div>
           )}
 
           <button
             onClick={handleDownloadTest}
-            disabled={
-              isLoading || (totalResults > 0 && totalResults < totalExpected)
-            }
+            disabled={isInProgress}
             className="submit-button group dir-fa"
           >
             <Search />
-            {isLoading || (totalResults > 0 && totalResults < totalExpected)
-              ? "در حال بررسی..."
-              : "بررسی سرعت دانلود"}
+            {isInProgress ? "در حال بررسی..." : "بررسی سرعت دانلود"}
           </button>
+          </div>
+
+          {isInProgress && (
+            <button
+              type="button"
+              onClick={() => void handleCancel()}
+              className="cancel-test-button-standalone"
+              title="لغو"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="1" width="4.5" height="14" rx="1.2"/><rect x="9.5" y="1" width="4.5" height="14" rx="1.2"/></svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -266,10 +285,10 @@ export default function Download() {
         </div>
 
         <div className="flex items-end gap-2 dir-fa">
-          <div className="w-[122px] h-[43px] bg-[#30363D] border-[#444C56] border rounded-xl grid grid-cols-3 cursor-pointer">
+          <div className="w-30.5 h-10.75 bg-[#30363D] border-[#444C56] border rounded-xl grid grid-cols-3">
             <button
               onClick={() => setDownloadTime(downloadTime + 1)}
-              className="h-full w-full flex items-center justify-center hover:bg-[#262a30] rounded-r-xl p-1 select-none cursor-pointer"
+              className="h-full w-full flex items-center justify-center hover:bg-[#262a30] rounded-r-xl p-1 select-none"
             >
               +
             </button>
@@ -282,14 +301,14 @@ export default function Download() {
             />
             <button
               onClick={() => setDownloadTime(downloadTime - 1)}
-              className="h-full w-full flex items-center justify-center hover:bg-[#262a30] rounded-l-xl p-1 select-none cursor-pointer"
+              className="h-full w-full flex items-center justify-center hover:bg-[#262a30] rounded-l-xl p-1 select-none"
             >
               -
             </button>
           </div>
           <p className="h-full text-md">ثانیه</p>
         </div>
-        <div className="text-right dir-fa mt-3 text-sm text-[#F5C518] flex items-center h-[20px]">
+        <div className="text-right dir-fa mt-3 text-sm text-[#F5C518] flex items-center h-5">
           {downloadTime <= 5 ? (
             <>
               <Info fill="#F5C518" />
@@ -327,7 +346,7 @@ export default function Download() {
           <div className="grid grid-cols-2 gap-4 flex-1 min-h-0 dir-fa">
             {/* Right Column - Successful */}
             <div className="relative flex flex-col overflow-auto">
-              <div className="mb-4 text-center flex-shrink-0">
+              <div className="mb-4 text-center shrink-0">
                 <span className="text-green-400 text-sm font-medium">
                   قابل استفاده ({successResults.length})
                 </span>
@@ -358,10 +377,7 @@ export default function Download() {
 
               {successResults.length > 5 && (
                 <>
-                  {/* Black Gradient Overlay */}
                   <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
-
-                  {/* More Items Button */}
                   <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2">
                     <button
                       onClick={() => scrollToBottom(rightColumnRef)}
@@ -377,7 +393,7 @@ export default function Download() {
 
             {/* Left Column - Failed */}
             <div className="relative flex flex-col overflow-auto">
-              <div className="mb-4 text-center flex-shrink-0">
+              <div className="mb-4 text-center shrink-0">
                 <span className="text-red-400 text-sm font-medium">
                   ناموفق ({failedResults.length})
                 </span>
@@ -398,6 +414,21 @@ export default function Download() {
                   />
                 ))}
               </div>
+
+              {failedResults.length > 5 && (
+                <>
+                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
+                  <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2">
+                    <button
+                      onClick={() => scrollToBottom(leftColumnRef)}
+                      className="text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 shadow-lg dir-fa flex items-center gap-2"
+                    >
+                      <DoubleChevronDown />
+                      موارد بیشتر
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

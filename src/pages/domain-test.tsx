@@ -11,6 +11,7 @@ import XIcon from "../components/svg/x-icon";
 import CheckIcon from "../components/svg/check-icon";
 import Retry from "../components/svg/retry";
 import { useSetSystemDns } from "../hooks/use-set-system-dns";
+import { cancelRunningTests } from "../hooks/use-cancel-test";
 
 interface DnsTestResult {
   dns_server: string;
@@ -118,6 +119,7 @@ export default function DomainTest() {
     setIsCompleted(false);
     setUsableResults([]);
     setUnusableResults([]);
+    currentSessionRef.current = 0;
 
     try {
       await invoke("test_dns_servers", {
@@ -132,11 +134,21 @@ export default function DomainTest() {
 
   const totalResults = usableResults.length + unusableResults.length;
   const totalExpected = 27; // Total number of DNS servers
+  const isInProgress =
+    !isCompleted &&
+    (isLoading || (totalResults > 0 && totalResults < totalExpected));
+
+  const handleCancel = async () => {
+    currentSessionRef.current += 1;
+    await cancelRunningTests();
+    setIsLoading(false);
+    setIsCompleted(true);
+  };
 
   return (
-    <div className="text-right h-full flex flex-col pr-[35px]">
+    <div className="text-right h-full flex flex-col pr-8.75">
       {/* Input Section - Fixed height */}
-      <div className="flex-shrink-0">
+      <div className="shrink-0">
         <p className="mb-4 flex justify-end items-center gap-2">
           <button
             className="cursor-pointer"
@@ -161,7 +173,8 @@ export default function DomainTest() {
           </button>
           دامنه مورد نظر
         </p>
-        <div className="mb-4 relative">
+        <div className="mb-4 flex gap-2 items-stretch">
+          <div className="relative flex-1 min-w-0">
           {/* Progress Bar Background */}
           {(totalResults > 0 || isLoading) && (
             <div className="absolute inset-0 rounded-md overflow-hidden">
@@ -184,31 +197,39 @@ export default function DomainTest() {
             onKeyDown={(e) => e.key === "Enter" && handleDnsTest()}
             className="main-input dir-fa"
             placeholder="مثلا spotify.com"
-            disabled={isLoading}
+            disabled={isInProgress}
             autoCorrect="off"
             autoComplete="off"
             spellCheck="false"
           />
 
           {/* Progress Text */}
-          {(totalResults > 0 || isLoading) && (
-            <div className="absolute left-[170px] top-1/2 transform -translate-y-1/2 text-xs text-gray-400 z-20">
+          {isInProgress && (
+            <div className="absolute left-42.5 top-1/2 transform -translate-y-1/2 text-xs text-gray-400 z-20 pointer-events-none">
               {totalResults} / {totalExpected}
             </div>
           )}
 
           <button
             onClick={handleDnsTest}
-            disabled={
-              isLoading || (totalResults > 0 && totalResults < totalExpected)
-            }
+            disabled={isInProgress}
             className="submit-button group dir-fa"
           >
             <Search />
-            {isLoading || (totalResults > 0 && totalResults < totalExpected)
-              ? "در حال بررسی..."
-              : "بررسی DNS ها"}
+            {isInProgress ? "در حال بررسی..." : "بررسی DNS ها"}
           </button>
+          </div>
+
+          {isInProgress && (
+            <button
+              type="button"
+              onClick={() => void handleCancel()}
+              className="cancel-test-button-standalone"
+              title="لغو"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="1" width="4.5" height="14" rx="1.2"/><rect x="9.5" y="1" width="4.5" height="14" rx="1.2"/></svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -228,7 +249,7 @@ export default function DomainTest() {
           <div className="grid grid-cols-2 gap-4 flex-1 min-h-0 dir-fa">
             {/* Right Column - Usable DNS servers */}
             <div className="relative flex flex-col overflow-auto">
-              <div className="mb-4 text-center flex-shrink-0">
+              <div className="mb-4 text-center shrink-0">
                 <span className="text-green-400 text-sm font-medium">
                   قابل استفاده ({usableResults.length})
                 </span>
@@ -259,7 +280,7 @@ export default function DomainTest() {
                     </p>
                     <button
                       onClick={handleDnsTest}
-                      className="flex gap-2 mt-2 cursor-pointer text-white hover:text-[#848484] transition-colors duration-200 shadow-lg dir-fa items-center justify-center px-4 py-2 rounded-lg text-sm"
+                      className="flex gap-2 mt-2 text-white hover:text-[#848484] transition-colors duration-200 shadow-lg dir-fa items-center justify-center px-4 py-2 rounded-lg text-sm"
                     >
                       <Retry />
                       تست مجدد
@@ -289,7 +310,7 @@ export default function DomainTest() {
 
             {/* Left Column - Unusable DNS servers */}
             <div className="relative flex flex-col overflow-auto">
-              <div className="mb-4 text-center flex-shrink-0">
+              <div className="mb-4 text-center shrink-0">
                 <span className="text-red-400 text-sm font-medium">
                   مسدود شده ({unusableResults.length})
                 </span>

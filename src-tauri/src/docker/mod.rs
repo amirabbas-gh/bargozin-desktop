@@ -57,7 +57,8 @@ pub async fn download_docker_config_file(url: &str, path: &PathBuf) -> Result<()
     let content = tokio::task::spawn_blocking({
         let url = url.to_string();
         move || -> Result<Vec<u8>> {
-            let response = ureq::get(&url).call()?;
+            let agent = crate::proxy::apply_ureq_proxy(ureq::AgentBuilder::new()).build();
+            let response = agent.get(&url).call()?;
             let mut buffer = Vec::new();
             response.into_reader().read_to_end(&mut buffer)?;
             Ok(buffer)
@@ -85,10 +86,12 @@ pub fn download_with_ureq(url: &str, max_duration: Duration) -> Result<u64> {
     let start_time = Instant::now();
     println!("Starting download from: {}", url);
     
-    let agent = ureq::AgentBuilder::new()
-        .timeout(max_duration)
-        .user_agent("registry-speed-tester/0.1")
-        .build();
+    let agent = crate::proxy::apply_ureq_proxy(
+        ureq::AgentBuilder::new()
+            .timeout(max_duration)
+            .user_agent("registry-speed-tester/0.1"),
+    )
+    .build();
 
     let response = agent.get(url).call()?;
     

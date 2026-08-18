@@ -56,10 +56,12 @@ pub struct LayerDescriptor {
 
 // Create a configured HTTP client
 fn create_http_client() -> Result<ureq::Agent> {
-    let agent = ureq::AgentBuilder::new()
-        .timeout(Duration::from_secs(30))
-        .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        .build();
+    let agent = crate::proxy::apply_ureq_proxy(
+        ureq::AgentBuilder::new()
+            .timeout(Duration::from_secs(30))
+            .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
+    )
+    .build();
     Ok(agent)
 }
 

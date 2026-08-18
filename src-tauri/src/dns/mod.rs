@@ -135,12 +135,14 @@ pub async fn check_url_with_custom_dns(url: &Url, dns_ip: &str) -> Option<(u16, 
 
     // Build HTTP client with the resolved IP address
     // The .resolve() method tells reqwest to use this specific IP for this hostname
-    let client = match Client::builder()
-        .danger_accept_invalid_certs(true)
-        .timeout(Duration::from_secs(10))
-        .user_agent("Mozilla/5.0 (compatible; Bargozin-DNS-Tester)")
-        .resolve(host, socket_addr)  // Map hostname to resolved IP
-        .build()
+    let client = match crate::proxy::apply_reqwest_proxy(
+        Client::builder()
+            .danger_accept_invalid_certs(true)
+            .timeout(Duration::from_secs(10))
+            .user_agent("Mozilla/5.0 (compatible; Bargozin-DNS-Tester)")
+            .resolve(host, socket_addr),
+    )
+    .build()
     {
         Ok(c) => c,
         Err(e) => {
@@ -326,11 +328,13 @@ async fn download_with_custom_dns(url: &str, dns_ip: &str, timeout_seconds: u64,
         return Err(anyhow::anyhow!("Operation timed out before HTTP request"));
     }
 
-    let client = Client::builder()
-        .danger_accept_invalid_certs(true)
-        .timeout(remaining_time) // Use remaining time, not extra time
-        .resolve(host, socket_addr)
-        .build()?;
+    let client = crate::proxy::apply_reqwest_proxy(
+        Client::builder()
+            .danger_accept_invalid_certs(true)
+            .timeout(remaining_time)
+            .resolve(host, socket_addr),
+    )
+    .build()?;
 
     let download_start = Instant::now();
     
