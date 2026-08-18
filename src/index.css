@@ -91,6 +91,15 @@
     @apply w-full pl-50 bg-[#30363D] border border-[#6B7280] rounded-md p-4 text-sm text-right focus:outline-none focus:border-[#8B9DC3] relative z-10;
   }
 
+
+  .action-chip {
+    @apply shrink-0 px-2.5 py-1 rounded-md text-[11px] font-medium border border-[#3FB950]/35 text-[#56d364] bg-[#3FB950]/10 hover:bg-[#3FB950]/20 hover:border-[#3FB950]/60 transition-all duration-200 cursor-pointer leading-none;
+  }
+
+  .reset-dns-btn {
+    @apply inline-flex items-center justify-center h-8 px-3.5 rounded-full text-[11px] leading-none border border-[#30363D] text-[#9BA3AF] hover:border-[#F85149]/50 hover:text-[#F85149] hover:bg-[#F85149]/10 transition-all duration-200 cursor-pointer;
+  }
+
   .submit-button {
     @apply h-[calc(100%-14px)] absolute left-2 top-[7px] text-[14px] p-2 px-5 transition rounded bg-[#38727C] !text-white flex items-center gap-2 cursor-pointer hover:bg-[#96989A] hover:text-[#848484] disabled:opacity-50 disabled:cursor-not-allowed z-20;
   }

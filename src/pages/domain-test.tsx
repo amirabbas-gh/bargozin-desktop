@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import XIcon from "../components/svg/x-icon";
 import CheckIcon from "../components/svg/check-icon";
 import Retry from "../components/svg/retry";
+import { useSetSystemDns } from "../hooks/use-set-system-dns";
 
 interface DnsTestResult {
   dns_server: string;
@@ -22,6 +23,7 @@ interface DnsTestResult {
 export default function DomainTest() {
   const { showInfo, showError } = useAlertHelpers();
   const { hideAlert } = useAlert();
+  const { requestResetDns } = useSetSystemDns();
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const rightColumnRef = useRef<HTMLDivElement>(null);
   const currentSessionRef = useRef<number>(0);
@@ -213,6 +215,14 @@ export default function DomainTest() {
       {/* Results Section - Takes remaining space */}
       <div className="flex-1 flex flex-col min-h-0">
         <p className="text-center mt-2 mb-3">نتایج تست</p>
+
+        {isCompleted && usableResults.length > 0 && (
+          <div className="flex justify-center mb-3">
+            <button onClick={requestResetDns} className="reset-dns-btn dir-fa">
+              بازنشانی DNS
+            </button>
+          </div>
+        )}
 
         {(totalResults > 0 || isCompleted) && (
           <div className="grid grid-cols-2 gap-4 flex-1 min-h-0 dir-fa">

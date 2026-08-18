@@ -7,6 +7,7 @@ import Search from "../components/svg/search";
 import DownloadResultItem from "../components/download-result-item";
 import { useAlert, useAlertHelpers } from "../components/alert";
 import Info from "../components/svg/info";
+import { useSetSystemDns } from "../hooks/use-set-system-dns";
 
 // Type definition for download speed test results
 interface DownloadSpeedResult {
@@ -142,6 +143,10 @@ export default function Download() {
 
   const { showInfo } = useAlertHelpers();
   const { hideAlert } = useAlert();
+  const { requestResetDns } = useSetSystemDns();
+
+  const successResults = usableResults.filter((r) => r.success);
+  const failedResults = usableResults.filter((r) => !r.success);
 
   return (
     <div className="text-right h-full flex flex-col pr-[35px]">
@@ -310,37 +315,48 @@ export default function Download() {
       <div className="flex-1 flex flex-col min-h-0 mt-2">
         <p className="text-right mb-3">نتایج تست</p>
 
+        {isCompleted && successResults.length > 0 && (
+          <div className="flex justify-center mb-3">
+            <button onClick={requestResetDns} className="reset-dns-btn dir-fa">
+              بازنشانی DNS
+            </button>
+          </div>
+        )}
+
         {(totalResults > 0 || isCompleted) && (
           <div className="grid grid-cols-2 gap-4 flex-1 min-h-0 dir-fa">
-            {/* Right Column - Usable DNS servers */}
-            <div className="relative flex flex-col overflow-auto justify-center items-center">
+            {/* Right Column - Successful */}
+            <div className="relative flex flex-col overflow-auto">
+              <div className="mb-4 text-center flex-shrink-0">
+                <span className="text-green-400 text-sm font-medium">
+                  قابل استفاده ({successResults.length})
+                </span>
+              </div>
               <div
                 ref={rightColumnRef}
                 className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 pb-4 w-full"
               >
-                {usableResults
+                {successResults
                   .sort((a, b) => b.download_speed_mbps - a.download_speed_mbps)
                   .map((result, index) => (
                     <DownloadResultItem
-                      key={`usable-${index}`}
+                      key={`success-${index}`}
                       dns={result.dns_server}
-                      status={result.success}
+                      status={true}
                       responseTime={result.download_speed_mbps / 8}
                       errorMessage={result.error_message}
                       isDownloadSpeed={true}
                       isBest={index === 0}
                     />
                   ))}
-                {usableResults.filter((result) => result.success).length ===
-                  0 &&
-                  isCompleted && (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                      <p>متأسفانه هیچ سرور DNS قابل استفاده‌ای یافت نشد</p>
-                    </div>
-                  )}
+                {successResults.length === 0 && isCompleted && (
+                  <div className="flex items-center justify-center h-full text-gray-400 text-center">
+                    <p>متأسفانه هیچ سرور DNS قابل استفاده‌ای یافت نشد</p>
+                  </div>
+                )}
               </div>
 
-              {usableResults.filter((result) => result.success).length > 5 && (
+              {successResults.length > 5 && (
                 <>
                   {/* Black Gradient Overlay */}
                   <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
@@ -359,12 +375,29 @@ export default function Download() {
               )}
             </div>
 
-            {/* Left Column - Unusable DNS servers */}
-            <div className="relative flex flex-col overflow-auto justify-center items-center">
+            {/* Left Column - Failed */}
+            <div className="relative flex flex-col overflow-auto">
+              <div className="mb-4 text-center flex-shrink-0">
+                <span className="text-red-400 text-sm font-medium">
+                  ناموفق ({failedResults.length})
+                </span>
+              </div>
               <div
                 ref={leftColumnRef}
-                className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 pb-4"
-              ></div>
+                className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 pb-4 w-full"
+              >
+                {failedResults.map((result, index) => (
+                  <DownloadResultItem
+                    key={`failed-${index}`}
+                    dns={result.dns_server}
+                    status={false}
+                    responseTime={0}
+                    errorMessage={result.error_message}
+                    isDownloadSpeed={true}
+                    allowSetDns={false}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         )}
