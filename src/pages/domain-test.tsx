@@ -32,7 +32,7 @@ export default function DomainTest() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  const scrollToBottom = (ref: React.RefObject<HTMLDivElement>) => {
+  const scrollToBottom = (ref: React.RefObject<HTMLDivElement | null>) => {
     if (ref.current) {
       ref.current.scrollTo({
         top: ref.current.scrollHeight,

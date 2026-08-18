@@ -32,7 +32,7 @@ export default function Docker() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [timeoutSeconds, setTimeoutSeconds] = useState(10);
 
-  const scrollToBottom = (ref: React.RefObject<HTMLDivElement>) => {
+  const scrollToBottom = (ref: React.RefObject<HTMLDivElement | null>) => {
     if (ref.current) {
       ref.current.scrollTo({
         top: ref.current.scrollHeight,

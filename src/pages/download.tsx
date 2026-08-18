@@ -131,7 +131,7 @@ export default function Download() {
     }
   };
 
-  const scrollToBottom = (ref: React.RefObject<HTMLDivElement>) => {
+  const scrollToBottom = (ref: React.RefObject<HTMLDivElement | null>) => {
     if (ref.current) {
       ref.current.scrollTo({
         top: ref.current.scrollHeight,
