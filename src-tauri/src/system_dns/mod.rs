@@ -1,6 +1,10 @@
 use std::net::IpAddr;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 use std::process::Command;
 use std::str::FromStr;
+
+#[cfg(target_os = "windows")]
+mod windows;
 
 pub fn validate_dns_ip(dns: &str) -> Result<(), String> {
     IpAddr::from_str(dns.trim()).map_err(|_| "Invalid DNS address".to_string())?;
@@ -15,7 +19,7 @@ pub fn set_system_dns_sync(dns_server: &str) -> Result<String, String> {
     return set_dns_macos(dns);
 
     #[cfg(target_os = "windows")]
-    return set_dns_windows(dns);
+    return windows::set_dns_windows(dns);
 
     #[cfg(target_os = "linux")]
     return set_dns_linux(dns);
@@ -36,7 +40,7 @@ pub fn reset_system_dns_sync() -> Result<String, String> {
     return reset_dns_macos();
 
     #[cfg(target_os = "windows")]
-    return reset_dns_windows();
+    return windows::reset_dns_windows();
 
     #[cfg(target_os = "linux")]
     return reset_dns_linux();
@@ -137,42 +141,6 @@ fn run_osascript_admin(script: &str) -> Result<(), String> {
     Err(format!("Failed to set DNS: {}", stderr.trim()))
 }
 
-#[cfg(target_os = "windows")]
-fn set_dns_windows(dns: &str) -> Result<String, String> {
-    let interface = get_active_windows_interface()?;
-    let script = format!(
-        "Start-Process netsh -Verb RunAs -Wait -ArgumentList 'interface','ip','set','dns','name={interface}','static','{dns}'; ipconfig /flushdns"
-    );
-
-    let output = Command::new("powershell")
-        .args(["-NoProfile", "-Command", &script])
-        .output()
-        .map_err(|e| format!("Failed to run command: {e}"))?;
-
-    if output.status.success() {
-        return Ok(format!("DNS set to {dns} on {interface}"));
-    }
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    Err(format!("Failed to set DNS: {}", stderr.trim()))
-}
-
-#[cfg(target_os = "windows")]
-fn get_active_windows_interface() -> Result<String, String> {
-    let script = "(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null } | Select-Object -First 1 -ExpandProperty InterfaceAlias)";
-    let output = Command::new("powershell")
-        .args(["-NoProfile", "-Command", script])
-        .output()
-        .map_err(|e| format!("Failed to detect network interface: {e}"))?;
-
-    let interface = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if interface.is_empty() {
-        return Err("No active network interface found".to_string());
-    }
-
-    Ok(interface)
-}
-
 #[cfg(target_os = "linux")]
 fn set_dns_linux(dns: &str) -> Result<String, String> {
     if command_exists("nmcli") {
@@ -244,21 +212,13 @@ fn run_pkexec(script: &str) -> Result<(), String> {
     Err(format!("Failed to set DNS: {}", stderr.trim()))
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(target_os = "linux")]
 fn command_exists(command: &str) -> bool {
-    if cfg!(target_os = "windows") {
-        Command::new("where")
-            .arg(command)
-            .output()
-            .map(|output| output.status.success())
-            .unwrap_or(false)
-    } else {
-        Command::new("which")
-            .arg(command)
-            .output()
-            .map(|output| output.status.success())
-            .unwrap_or(false)
-    }
+    Command::new("which")
+        .arg(command)
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 #[cfg(target_os = "macos")]
@@ -270,24 +230,6 @@ fn reset_dns_macos() -> Result<String, String> {
     );
     run_osascript_admin(&script)?;
     Ok(format!("DNS reset to automatic (DHCP) on {service}"))
-}
-
-#[cfg(target_os = "windows")]
-fn reset_dns_windows() -> Result<String, String> {
-    let interface = get_active_windows_interface()?;
-    let script = format!(
-        "Start-Process netsh -Verb RunAs -Wait -ArgumentList 'interface','ip','set','dns','name={interface}','dhcp'; ipconfig /flushdns"
-    );
-    let output = Command::new("powershell")
-        .args(["-NoProfile", "-Command", &script])
-        .output()
-        .map_err(|e| format!("Failed to run command: {e}"))?;
-
-    if output.status.success() {
-        return Ok(format!("DNS reset to automatic (DHCP) on {interface}"));
-    }
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    Err(format!("Failed to reset DNS: {}", stderr.trim()))
 }
 
 #[cfg(target_os = "linux")]
@@ -340,6 +282,7 @@ fn reset_dns_resolvectl() -> Result<String, String> {
     Ok(format!("DNS reset to automatic on {interface}"))
 }
 
+#[cfg(target_os = "macos")]
 fn escape_for_shell(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
