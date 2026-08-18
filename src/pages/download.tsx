@@ -9,6 +9,7 @@ import { useAlert, useAlertHelpers } from "../components/alert";
 import Info from "../components/svg/info";
 import { useSetSystemDns } from "../hooks/use-set-system-dns";
 import { cancelRunningTests } from "../hooks/use-cancel-test";
+import { useScrollHint } from "../hooks/use-scroll-hint";
 
 // Type definition for download speed test results
 interface DownloadSpeedResult {
@@ -152,6 +153,8 @@ export default function Download() {
     !isCompleted &&
     (isLoading || (totalResults > 0 && totalResults < totalExpected));
 
+  const showSuccessMoreHint = useScrollHint(rightColumnRef, [successResults.length]);
+  const showFailedMoreHint = useScrollHint(leftColumnRef, [failedResults.length]);
   const handleCancel = async () => {
     currentSessionRef.current += 1;
     await cancelRunningTests();
@@ -375,13 +378,13 @@ export default function Download() {
                 )}
               </div>
 
-              {successResults.length > 5 && (
+              {successResults.length > 5 && showSuccessMoreHint && (
                 <>
-                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
+                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-linear-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
                   <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2">
                     <button
                       onClick={() => scrollToBottom(rightColumnRef)}
-                      className="text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 shadow-lg dir-fa flex items-center gap-2"
+                      className="text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 shadow-lg dir-fa flex items-center gap-2 cursor-pointer"
                     >
                       <DoubleChevronDown />
                       موارد بیشتر
@@ -415,7 +418,7 @@ export default function Download() {
                 ))}
               </div>
 
-              {failedResults.length > 5 && (
+              {failedResults.length > 5 && showFailedMoreHint && (
                 <>
                   <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
                   <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2">

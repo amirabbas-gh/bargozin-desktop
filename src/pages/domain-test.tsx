@@ -12,6 +12,7 @@ import CheckIcon from "../components/svg/check-icon";
 import Retry from "../components/svg/retry";
 import { useSetSystemDns } from "../hooks/use-set-system-dns";
 import { cancelRunningTests } from "../hooks/use-cancel-test";
+import { useScrollHint } from "../hooks/use-scroll-hint";
 
 interface DnsTestResult {
   dns_server: string;
@@ -138,6 +139,8 @@ export default function DomainTest() {
     !isCompleted &&
     (isLoading || (totalResults > 0 && totalResults < totalExpected));
 
+  const showUsableMoreHint = useScrollHint(rightColumnRef, [usableResults.length]);
+  const showUnusableMoreHint = useScrollHint(leftColumnRef, [unusableResults.length]);
   const handleCancel = async () => {
     currentSessionRef.current += 1;
     await cancelRunningTests();
@@ -289,16 +292,16 @@ export default function DomainTest() {
                 )}
               </div>
 
-              {usableResults.length > 5 && (
+              {usableResults.length > 5 && showUsableMoreHint && (
                 <>
                   {/* Black Gradient Overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
+                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-linear-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
 
                   {/* More Items Button */}
                   <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2">
                     <button
                       onClick={() => scrollToBottom(rightColumnRef)}
-                      className="text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 shadow-lg dir-fa flex items-center gap-2"
+                      className="text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 shadow-lg dir-fa flex items-center gap-2 cursor-pointer"
                     >
                       <DoubleChevronDown />
                       موارد بیشتر
@@ -338,7 +341,7 @@ export default function DomainTest() {
                 )}
               </div>
 
-              {unusableResults.length >= 5 && (
+              {unusableResults.length >= 5 && showUnusableMoreHint && (
                 <>
                   {/* Black Gradient Overlay */}
                   <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0D1117] to-transparent pointer-events-none"></div>
