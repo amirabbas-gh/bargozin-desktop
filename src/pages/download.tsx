@@ -166,30 +166,35 @@ export default function Download() {
     <div className="text-right h-full flex flex-col pr-8.75">
       {/* Input Section - Fixed height */}
       <div className="shrink-0">
-        <p className="mb-4 flex justify-end items-center gap-2">
-          <button
-            className="cursor-pointer"
-            onClick={() => {
-              showInfo(
-                "لینک فایلی را وارد کنید که به‌صورت مستقیم قابل دانلود باشد تا سرعت واقعی دانلود از دید DNSهای مختلف سنجیده شود. ",
-                {
-                  buttons: [
-                    {
-                      label: "متوجه شدم",
-                      action: () => {
-                        hideAlert("docker-image-validation-error");
-                      },
-                      variant: "none",
-                    },
-                  ],
-                }
-              );
-            }}
-          >
-            <Question className="w-5 h-5" />
+        <div className="mb-4 flex justify-between items-center min-h-8">
+          <button onClick={requestResetDns} className="reset-dns-btn dir-fa">
+            بازنشانی DNS
           </button>
-          آدرس فایل دانلودی{" "}
-        </p>
+          <p className="flex justify-end items-center gap-2">
+            <button
+              className="cursor-pointer"
+              onClick={() => {
+                showInfo(
+                  "لینک فایلی را وارد کنید که به‌صورت مستقیم قابل دانلود باشد تا سرعت واقعی دانلود از دید DNSهای مختلف سنجیده شود. ",
+                  {
+                    buttons: [
+                      {
+                        label: "متوجه شدم",
+                        action: () => {
+                          hideAlert("docker-image-validation-error");
+                        },
+                        variant: "none",
+                      },
+                    ],
+                  }
+                );
+              }}
+            >
+              <Question className="w-5 h-5" />
+            </button>
+            آدرس فایل دانلودی{" "}
+          </p>
+        </div>
         <div className="mb-4 flex gap-2 items-stretch">
           <div className="relative flex-1 min-w-0">
           {/* Progress Bar Background */}
@@ -335,12 +340,6 @@ export default function Download() {
 
       {/* Results Section - Takes remaining space */}
       <div className="flex-1 flex flex-col min-h-0 mt-2 mb-20">
-        <div className="flex justify-center mt-2 mb-3">
-          <button onClick={requestResetDns} className="reset-dns-btn dir-fa">
-            بازنشانی DNS
-          </button>
-        </div>
-
         {(totalResults > 0 || isCompleted) && (
           <div className="grid grid-cols-2 gap-4 flex-1 min-h-0 dir-fa">
             {/* Right Column - Successful */}

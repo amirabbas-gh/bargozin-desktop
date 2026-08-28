@@ -9,7 +9,6 @@ import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 import Info from "../components/svg/info";
 import { cancelRunningTests } from "../hooks/use-cancel-test";
-import { useSetSystemDns } from "../hooks/use-set-system-dns";
 import { useScrollHint } from "../hooks/use-scroll-hint";
 
 interface DockerRegistryTestResult {
@@ -26,7 +25,6 @@ interface DockerRegistryTestResult {
 export default function Docker() {
   const { showInfo, showError } = useAlertHelpers();
   const { hideAlert } = useAlert();
-  const { requestResetDns } = useSetSystemDns();
   const rightColumnRef = useRef<HTMLDivElement>(null);
   const currentSessionRef = useRef<number>(0);
 
@@ -162,30 +160,32 @@ export default function Docker() {
     <div className="text-right h-full flex flex-col pr-8.75">
       {/* Input Section - Fixed height */}
       <div className="shrink-0">
-        <p className="mb-4 flex justify-end items-center gap-2">
-          <button
-            className="cursor-pointer"
-            onClick={() =>
-              showInfo(
-                "در این فیلد باید نام کامل ایمیج داکر مورد نظر خود را وارد کنید. این نام شامل ریپازیتوری، تگ و در صورت نیاز، آدرس ریجیستری خواهد بود. اطمینان حاصل کنید که نام وارد شده دقیق و صحیح باشد تا فرآیند دانلود به درستی انجام شود.",
-                {
-                  buttons: [
-                    {
-                      label: "متوجه شدم",
-                      action: () => {
-                        hideAlert("docker-image-validation-error");
+        <div className="mb-4 flex justify-end items-center min-h-8">
+          <p className="flex items-center gap-2">
+            <button
+              className="cursor-pointer"
+              onClick={() =>
+                showInfo(
+                  "در این فیلد باید نام کامل ایمیج داکر مورد نظر خود را وارد کنید. این نام شامل ریپازیتوری، تگ و در صورت نیاز، آدرس ریجیستری خواهد بود. اطمینان حاصل کنید که نام وارد شده دقیق و صحیح باشد تا فرآیند دانلود به درستی انجام شود.",
+                  {
+                    buttons: [
+                      {
+                        label: "متوجه شدم",
+                        action: () => {
+                          hideAlert("docker-image-validation-error");
+                        },
+                        variant: "none",
                       },
-                      variant: "none",
-                    },
-                  ],
-                }
-              )
-            }
-          >
-            <Question className="w-5 h-5" />
-          </button>
-          ایمیج داکر
-        </p>
+                    ],
+                  }
+                )
+              }
+            >
+              <Question className="w-5 h-5" />
+            </button>
+            ایمیج داکر
+          </p>
+        </div>
         <div className="mb-4 flex gap-2 items-stretch">
           <div className="relative flex-1 min-w-0">
           {/* Progress Bar Background */}
@@ -331,12 +331,6 @@ export default function Docker() {
 
       {/* Results Section - Takes remaining space */}
       <div className="flex-1 flex flex-col min-h-0 mb-20">
-        <div className="flex justify-center mt-2 mb-3">
-          <button onClick={requestResetDns} className="reset-dns-btn dir-fa">
-            بازنشانی DNS
-          </button>
-        </div>
-
         {(totalResults > 0 || isCompleted) && (
           <div className="grid grid-cols-2 gap-4 flex-1 min-h-0 dir-fa">
             {/* Right Column - Docker registries */}
