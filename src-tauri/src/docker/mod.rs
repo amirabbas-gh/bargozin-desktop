@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -6,6 +7,22 @@ use tokio::io::AsyncWriteExt;
 use anyhow::Result;
 use regex::Regex;
 use std::io::Read;
+use futures_util::StreamExt;
+
+static DOWNLOAD_CANCELLED: AtomicBool = AtomicBool::new(false);
+
+/// Signal in-flight Docker blob downloads to stop reading and drop the connection.
+pub fn cancel_downloads() {
+    DOWNLOAD_CANCELLED.store(true, Ordering::SeqCst);
+}
+
+pub fn reset_download_cancellation() {
+    DOWNLOAD_CANCELLED.store(false, Ordering::SeqCst);
+}
+
+pub fn is_download_cancelled() -> bool {
+    DOWNLOAD_CANCELLED.load(Ordering::SeqCst)
+}
 
 mod get_manifest;
 use get_manifest::{fetch_tag_manifest, fetch_digest_manifest};
@@ -81,56 +98,63 @@ pub fn validate_docker_image_name(image_name: &str) -> bool {
     regex.is_match(image_name) && !image_name.contains("@@")
 }
 
-// Download function using ureq - returns downloaded bytes even on timeout
-pub fn download_with_ureq(url: &str, max_duration: Duration) -> Result<u64> {
+// Speed-test blob download. Must be async: ureq in spawn_blocking cannot be
+// aborted, so Cancel would keep reading until max_duration. Dropping this
+// future closes the HTTP connection and stops the traffic.
+pub async fn download_with_ureq(url: &str, max_duration: Duration) -> Result<u64> {
+    if is_download_cancelled() {
+        return Err(anyhow::anyhow!("Download cancelled"));
+    }
+
     let start_time = Instant::now();
     println!("Starting download from: {}", url);
-    
-    let agent = crate::proxy::apply_ureq_proxy(
-        ureq::AgentBuilder::new()
+
+    let client = crate::proxy::apply_reqwest_proxy(
+        reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .http1_only()
+            .connect_timeout(max_duration.min(Duration::from_secs(10)))
             .timeout(max_duration)
             .user_agent("registry-speed-tester/0.1"),
     )
-    .build();
+    .build()?;
 
-    let response = agent.get(url).call()?;
-    
-    if response.status() != 200 {
+    let response = client.get(url).send().await?;
+
+    if !response.status().is_success() {
         return Err(anyhow::anyhow!("HTTP error: {}", response.status()));
     }
 
-    let mut buffer = [0u8; 8192];
+    let mut stream = response.bytes_stream();
     let mut total_bytes: u64 = 0;
     let mut last_log_time = start_time;
 
-    let mut reader = response.into_reader();
-
     loop {
-        // Check timeout
+        if is_download_cancelled() {
+            println!("Download cancelled after {} bytes, dropping connection", total_bytes);
+            break;
+        }
+
         let elapsed = start_time.elapsed();
         if elapsed >= max_duration {
             println!("Download timeout reached after {} seconds, downloaded {} bytes", elapsed.as_secs_f64(), total_bytes);
             break;
         }
 
-        // Try to read data with a timeout-aware approach
-        match reader.read(&mut buffer) {
-            Ok(0) => {
-                // End of stream - completed successfully
-                break;
-            }
-            Ok(n) => {
-                total_bytes += n as u64;
+        // Wake frequently so Cancel is observed even if the sender stalls.
+        let poll = max_duration.saturating_sub(elapsed).min(Duration::from_millis(200));
 
-                // Log progress every second
+        match tokio::time::timeout(poll, stream.next()).await {
+            Ok(Some(Ok(chunk))) => {
+                total_bytes += chunk.len() as u64;
+
                 if last_log_time.elapsed() >= Duration::from_secs(1) {
                     let speed_mbps = (total_bytes as f64 * 8.0) / (elapsed.as_secs_f64() * 1_000_000.0);
                     println!("Downloaded {} bytes in {:.1}s, speed: {:.2} Mbps", total_bytes, elapsed.as_secs_f64(), speed_mbps);
                     last_log_time = Instant::now();
                 }
             }
-            Err(e) => {
-                // If we downloaded some data before the error, consider it a success
+            Ok(Some(Err(e))) => {
                 if total_bytes > 0 {
                     println!("Download interrupted after downloading {} bytes: {}", total_bytes, e);
                     break;
@@ -138,7 +162,13 @@ pub fn download_with_ureq(url: &str, max_duration: Duration) -> Result<u64> {
                     return Err(anyhow::anyhow!("Download failed: {}", e));
                 }
             }
+            Ok(None) => break,
+            Err(_) => continue,
         }
+    }
+
+    if is_download_cancelled() {
+        return Err(anyhow::anyhow!("Download cancelled"));
     }
 
     let final_elapsed = start_time.elapsed();
@@ -147,7 +177,7 @@ pub fn download_with_ureq(url: &str, max_duration: Duration) -> Result<u64> {
     } else {
         0.0
     };
-    
+
     println!("Download completed: {} bytes in {:.2}s, final speed: {:.2} Mbps", total_bytes, final_elapsed.as_secs_f64(), final_speed_mbps);
     Ok(total_bytes)
 }
@@ -158,6 +188,19 @@ pub async fn test_docker_registry_download_speed(
     timeout_seconds: u64,
 ) -> DockerRegistryTestResult {
     let start_time = Instant::now();
+
+    if is_download_cancelled() {
+        return DockerRegistryTestResult {
+            registry: registry.to_string(),
+            image_name: image_name.to_string(),
+            success: false,
+            download_speed_mbps: 0.0,
+            downloaded_bytes: 0,
+            test_duration_seconds: 0.0,
+            error_message: Some("Download cancelled".to_string()),
+            session_id: 0,
+        };
+    }
     
     // Validate image name
     if !validate_docker_image_name(image_name) {
@@ -303,12 +346,12 @@ async fn test_registry_with_manifest_approach(
     let blob_url = format!("{}/v2/{}/blobs/{}", registry_url, repository, layer_digest);
     println!("Downloading blob from: {}", blob_url);
     
-    let remaining_duration = max_duration - start_time.elapsed();
-    
-    // Use tokio::task::spawn_blocking to run the synchronous ureq download in async context
-    let downloaded_bytes = tokio::task::spawn_blocking(move || {
-        download_with_ureq(&blob_url, remaining_duration)
-    }).await??;
+    if is_download_cancelled() {
+        return Err(anyhow::anyhow!("Download cancelled"));
+    }
+
+    let remaining_duration = max_duration.saturating_sub(start_time.elapsed());
+    let downloaded_bytes = download_with_ureq(&blob_url, remaining_duration).await?;
     
     println!("Downloaded {} bytes from {}", downloaded_bytes, registry_url);
     Ok(downloaded_bytes)
