@@ -13,6 +13,7 @@ import Retry from "../components/svg/retry";
 import { useSetSystemDns } from "../hooks/use-set-system-dns";
 import { cancelRunningTests } from "../hooks/use-cancel-test";
 import { useScrollHint } from "../hooks/use-scroll-hint";
+import { useSyncTestRunning } from "../context/test-session";
 
 interface DnsTestResult {
   dns_server: string;
@@ -142,6 +143,7 @@ export default function DomainTest() {
     (isLoading || (totalResults > 0 && totalResults < totalExpected));
   const showUsableMoreHint = useScrollHint(rightColumnRef, [usableResults.length]);
   const showUnusableMoreHint = useScrollHint(leftColumnRef, [unusableResults.length]);
+  useSyncTestRunning(isInProgress);
 
   const handleCancel = async () => {
     currentSessionRef.current += 1;

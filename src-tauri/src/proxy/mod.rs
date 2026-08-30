@@ -1,6 +1,13 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
+
+static SETTINGS_LOCKED: AtomicBool = AtomicBool::new(false);
+
+pub fn set_settings_locked(locked: bool) {
+    SETTINGS_LOCKED.store(locked, Ordering::SeqCst);
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -43,7 +50,7 @@ impl ProxySettings {
     fn custom_url(&self, remote_dns: bool) -> Result<String, String> {
         let host = self.host.trim();
         if host.is_empty() || self.port == 0 {
-            return Err("آدرس و پورت پروکسی را وارد کنید".to_string());
+            return Err("Please enter a proxy host and port".to_string());
         }
 
         let mut scheme = match self.protocol {
@@ -84,6 +91,10 @@ pub fn current_settings() -> ProxySettings {
 
 #[tauri::command]
 pub async fn set_proxy_settings(settings: ProxySettings) -> Result<ProxySettings, String> {
+    if SETTINGS_LOCKED.load(Ordering::SeqCst) {
+        return Err("Cannot change proxy settings while a test is running".to_string());
+    }
+
     if settings.mode == ProxyMode::Custom {
         settings.custom_url(true)?;
     }

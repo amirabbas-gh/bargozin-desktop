@@ -1,4 +1,3 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -9,20 +8,7 @@ use regex::Regex;
 use std::io::Read;
 use futures_util::StreamExt;
 
-static DOWNLOAD_CANCELLED: AtomicBool = AtomicBool::new(false);
-
-/// Signal in-flight Docker blob downloads to stop reading and drop the connection.
-pub fn cancel_downloads() {
-    DOWNLOAD_CANCELLED.store(true, Ordering::SeqCst);
-}
-
-pub fn reset_download_cancellation() {
-    DOWNLOAD_CANCELLED.store(false, Ordering::SeqCst);
-}
-
-pub fn is_download_cancelled() -> bool {
-    DOWNLOAD_CANCELLED.load(Ordering::SeqCst)
-}
+use crate::task_control::is_cancelled;
 
 mod get_manifest;
 use get_manifest::{fetch_tag_manifest, fetch_digest_manifest};
@@ -102,7 +88,7 @@ pub fn validate_docker_image_name(image_name: &str) -> bool {
 // aborted, so Cancel would keep reading until max_duration. Dropping this
 // future closes the HTTP connection and stops the traffic.
 pub async fn download_with_ureq(url: &str, max_duration: Duration) -> Result<u64> {
-    if is_download_cancelled() {
+    if is_cancelled() {
         return Err(anyhow::anyhow!("Download cancelled"));
     }
 
@@ -130,7 +116,7 @@ pub async fn download_with_ureq(url: &str, max_duration: Duration) -> Result<u64
     let mut last_log_time = start_time;
 
     loop {
-        if is_download_cancelled() {
+        if is_cancelled() {
             println!("Download cancelled after {} bytes, dropping connection", total_bytes);
             break;
         }
@@ -167,7 +153,7 @@ pub async fn download_with_ureq(url: &str, max_duration: Duration) -> Result<u64
         }
     }
 
-    if is_download_cancelled() {
+    if is_cancelled() {
         return Err(anyhow::anyhow!("Download cancelled"));
     }
 
@@ -189,7 +175,7 @@ pub async fn test_docker_registry_download_speed(
 ) -> DockerRegistryTestResult {
     let start_time = Instant::now();
 
-    if is_download_cancelled() {
+    if is_cancelled() {
         return DockerRegistryTestResult {
             registry: registry.to_string(),
             image_name: image_name.to_string(),
@@ -346,7 +332,7 @@ async fn test_registry_with_manifest_approach(
     let blob_url = format!("{}/v2/{}/blobs/{}", registry_url, repository, layer_digest);
     println!("Downloading blob from: {}", blob_url);
     
-    if is_download_cancelled() {
+    if is_cancelled() {
         return Err(anyhow::anyhow!("Download cancelled"));
     }
 
@@ -359,6 +345,10 @@ async fn test_registry_with_manifest_approach(
 
 // Simplified helper function to get the first layer digest - following the user's example
 fn get_first_layer_digest(registry_url: &str, repository: &str, tag: &str) -> Result<String, anyhow::Error> {
+    if is_cancelled() {
+        return Err(anyhow::anyhow!("Download cancelled"));
+    }
+
     println!("Fetching tag manifest for {}:{}", repository, tag);
     
     // Step 1: Fetch tag manifest (exactly like user's example)

@@ -4,6 +4,13 @@ use std::time::Duration;
 use anyhow::Result;
 use std::io::Read;
 
+fn ensure_not_cancelled() -> Result<()> {
+    if crate::task_control::is_cancelled() {
+        anyhow::bail!("Download cancelled");
+    }
+    Ok(())
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ManifestList {
@@ -67,6 +74,7 @@ fn create_http_client() -> Result<ureq::Agent> {
 
 /// Fetch and parse a manifest list from a registry URL
 pub fn fetch_tag_manifest(registry_url: &str, image_name: &str, tag: &str) -> Result<ManifestList> {
+    ensure_not_cancelled()?;
     let agent = create_http_client()?;
     let url = format!("{}/v2/{}/manifests/{}", registry_url, image_name, tag);
     
@@ -100,6 +108,7 @@ pub fn fetch_tag_manifest(registry_url: &str, image_name: &str, tag: &str) -> Re
 }
 
 pub fn fetch_digest_manifest(registry_url: &str, image_name: &str, digest: &str) -> Result<DigestManifest> {
+    ensure_not_cancelled()?;
     let agent = create_http_client()?;
     let url = format!("{}/v2/{}/manifests/{}", registry_url, image_name, digest);
     

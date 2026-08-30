@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import Info from "../components/svg/info";
 import { cancelRunningTests } from "../hooks/use-cancel-test";
 import { useScrollHint } from "../hooks/use-scroll-hint";
+import { useSyncTestRunning } from "../context/test-session";
 
 interface DockerRegistryTestResult {
   registry: string;
@@ -148,6 +149,7 @@ export default function Docker() {
     !isCompleted &&
     (isLoading || (totalResults > 0 && totalResults < totalExpected));
   const showMoreHint = useScrollHint(rightColumnRef, [allResults.length]);
+  useSyncTestRunning(isInProgress);
 
   const handleCancel = async () => {
     currentSessionRef.current += 1;

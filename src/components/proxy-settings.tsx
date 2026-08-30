@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAlert, useAlertHelpers } from "./alert";
 import ChevronDown from "./svg/chevron-down";
 import { useProxy } from "../context/proxy-context";
+import { useTestSession } from "../context/test-session";
 import {
   proxyModeLabel,
   toEnglishDigits,
@@ -27,19 +28,24 @@ function RadioOption({
   label,
   selected,
   onSelect,
+  disabled,
 }: {
   label: string;
   selected: boolean;
   onSelect: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onSelect}
-      className={`w-full flex items-center justify-end gap-2.5 py-2 px-2 text-sm text-right rounded-lg transition-all duration-200 cursor-pointer ${
-        selected
-          ? "bg-gradient-to-br from-[#1C4C91] to-[#2F81F7] text-white"
-          : "hover:bg-[#122239]/60 text-[#CDCDCD]"
+      className={`w-full flex items-center justify-end gap-2.5 py-2 px-2 text-sm text-right rounded-lg transition-all duration-200 ${
+        disabled
+          ? "opacity-50 cursor-not-allowed text-[#CDCDCD]"
+          : selected
+          ? "bg-gradient-to-br from-[#1C4C91] to-[#2F81F7] text-white cursor-pointer"
+          : "hover:bg-[#122239]/60 text-[#CDCDCD] cursor-pointer"
       }`}
     >
       <span>{label}</span>
@@ -145,10 +151,17 @@ function CustomProxyModalForm({
 
 export default function ProxyFloatingButton() {
   const { config, applyConfig, proxyOnline } = useProxy();
+  const { isTestRunning } = useTestSession();
   const { showCustom } = useAlertHelpers();
   const { hideAlert } = useAlert();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isTestRunning) {
+      setOpen(false);
+    }
+  }, [isTestRunning]);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -161,6 +174,9 @@ export default function ProxyFloatingButton() {
   }, [open]);
 
   const openCustomModal = () => {
+    if (isTestRunning) {
+      return;
+    }
     let alertId = "";
     alertId = showCustom(
       <CustomProxyModalForm
@@ -184,6 +200,9 @@ export default function ProxyFloatingButton() {
   };
 
   const selectMode = async (mode: ProxyMode) => {
+    if (isTestRunning) {
+      return;
+    }
     if (mode === "custom") {
       openCustomModal();
       return;
@@ -225,6 +244,7 @@ export default function ProxyFloatingButton() {
             key={mode.id}
             label={mode.label}
             selected={config.mode === mode.id}
+            disabled={isTestRunning}
             onSelect={() => void selectMode(mode.id)}
           />
         ))}
@@ -233,7 +253,8 @@ export default function ProxyFloatingButton() {
           <button
             type="button"
             onClick={openCustomModal}
-            className="mt-2 w-full h-8 rounded-lg text-[11px] btn-gradient-teal cursor-pointer"
+            disabled={isTestRunning}
+            className="mt-2 w-full h-8 rounded-lg text-[11px] btn-gradient-teal cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             ویرایش پروکسی
           </button>
@@ -242,16 +263,23 @@ export default function ProxyFloatingButton() {
 
       <button
         type="button"
+        disabled={isTestRunning}
         onClick={() => setOpen((v) => !v)}
-        title={modeSummary(config)}
-        className={`flex items-center justify-between gap-4 px-4 py-2.5 w-[148px] rounded-xl shadow-lg border transition-all duration-200 cursor-pointer ${
-          open
-            ? "btn-gradient-primary border-transparent"
+        title={
+          isTestRunning
+            ? "تا پایان تست نمی‌توان پروکسی را تغییر داد"
+            : modeSummary(config)
+        }
+        className={`flex items-center justify-between gap-4 px-4 py-2.5 w-[148px] rounded-xl shadow-lg border transition-all duration-200 ${
+          isTestRunning
+            ? "bg-[#161B22] border-[#30363D] text-[#848484] opacity-60 cursor-not-allowed"
+            : open
+            ? "btn-gradient-primary border-transparent cursor-pointer"
             : isActive && proxyOnline === false
-              ? "bg-[#161B22] border-[#F85149]/60 text-white"
+              ? "bg-[#161B22] border-[#F85149]/60 text-white cursor-pointer"
               : isActive
-              ? "bg-[#161B22] border-[#2F81F7] text-white"
-              : "bg-[#161B22] border-[#30363D] text-[#CDCDCD] hover:border-[#444C56] hover:text-white"
+              ? "bg-[#161B22] border-[#2F81F7] text-white cursor-pointer"
+              : "bg-[#161B22] border-[#30363D] text-[#CDCDCD] hover:border-[#444C56] hover:text-white cursor-pointer"
         }`}
       >
         <p className="text-sm whitespace-nowrap flex items-center gap-1.5">

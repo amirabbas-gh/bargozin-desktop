@@ -4,6 +4,7 @@ mod commands;
 mod utils;
 mod system_dns;
 mod proxy;
+mod task_control;
 
 pub use dns::{DnsTestResult, DownloadSpeedResult};
 pub use commands::*;

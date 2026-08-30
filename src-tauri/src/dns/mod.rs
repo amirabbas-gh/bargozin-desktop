@@ -231,27 +231,22 @@ pub async fn test_single_dns_server(domain: String, dns_server: String, _session
 }
 
 fn ensure_https(domain: &str) -> String {
-    let mut url = domain.to_string();
-    
-    // Remove existing protocol if present
-    if url.starts_with("http://") {
-        url = url.strip_prefix("http://").unwrap().to_string();
+    let mut host_part = domain.to_string();
+
+    if let Some(stripped) = host_part.strip_prefix("http://") {
+        host_part = stripped.to_string();
     }
-    if url.starts_with("https://") {
-        url = url.strip_prefix("https://").unwrap().to_string();
+    if let Some(stripped) = host_part.strip_prefix("https://") {
+        host_part = stripped.to_string();
     }
-    
-    // Add https:// and ensure it ends with /
-    let mut result = format!("https://{}", url);
-    
-    // Parse to extract just the host part (like Go code)
-    if let Ok(parsed) = url::Url::parse(&result) {
-        if let Some(host) = parsed.host_str() {
-            result = format!("https://{}/", host);
-        }
+
+    let candidate = format!("https://{}", host_part);
+    match Url::parse(&candidate).ok().and_then(|parsed| {
+        parsed.host_str().map(|host| format!("https://{}/", host))
+    }) {
+        Some(normalized) => normalized,
+        None => candidate,
     }
-    
-    result
 }
 
 async fn resolve_host_with_dns(host: &str, dns_server: &str) -> anyhow::Result<IpAddr> {
@@ -336,8 +331,6 @@ async fn download_with_custom_dns(url: &str, dns_ip: &str, timeout_seconds: u64,
     )
     .build()?;
 
-    let download_start = Instant::now();
-    
     let response = client.get(url).send().await
         .map_err(|e| anyhow::anyhow!("HTTP request failed: {}", e))?;
 
@@ -345,6 +338,11 @@ async fn download_with_custom_dns(url: &str, dns_ip: &str, timeout_seconds: u64,
     let mut stream = response.bytes_stream();
 
     while let Some(chunk_result) = stream.next().await {
+        if crate::task_control::is_cancelled() {
+            println!("Download aborted by user after {} bytes", downloaded_bytes);
+            break;
+        }
+
         // Check if overall timeout has been reached
         if overall_start.elapsed() >= timeout_duration {
             break;
@@ -353,11 +351,10 @@ async fn download_with_custom_dns(url: &str, dns_ip: &str, timeout_seconds: u64,
         let chunk = chunk_result
             .map_err(|e| anyhow::anyhow!("Stream error: {}", e))?;
         downloaded_bytes += chunk.len() as u64;
-        
-        // Add periodic check for cancellation (every 1MB or every 1 second)
-        if downloaded_bytes % (1024 * 1024) == 0 || download_start.elapsed().as_secs() > 1 {
-            tokio::task::yield_now().await; // Allow other tasks to run and check for cancellation
-        }
+    }
+
+    if crate::task_control::is_cancelled() {
+        return Err(anyhow::anyhow!("Download cancelled"));
     }
 
     let elapsed = overall_start.elapsed().as_secs_f64(); // Use overall elapsed time

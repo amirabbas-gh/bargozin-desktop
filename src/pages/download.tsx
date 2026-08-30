@@ -10,6 +10,7 @@ import Info from "../components/svg/info";
 import { useSetSystemDns } from "../hooks/use-set-system-dns";
 import { cancelRunningTests } from "../hooks/use-cancel-test";
 import { useScrollHint } from "../hooks/use-scroll-hint";
+import { useSyncTestRunning } from "../context/test-session";
 
 // Type definition for download speed test results
 interface DownloadSpeedResult {
@@ -154,6 +155,7 @@ export default function Download() {
     (isLoading || (totalResults > 0 && totalResults < totalExpected));
   const showSuccessMoreHint = useScrollHint(rightColumnRef, [successResults.length]);
   const showFailedMoreHint = useScrollHint(leftColumnRef, [failedResults.length]);
+  useSyncTestRunning(isInProgress);
 
   const handleCancel = async () => {
     currentSessionRef.current += 1;
